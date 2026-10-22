@@ -1,0 +1,14 @@
+# Node dependencies
+webapp/node_modules/
+webapp/.env
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+ml-service/.venv/
+ml-service/env/
+
+# System files
+.DS_Store
+Thumbs.db

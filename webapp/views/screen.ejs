@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-CHAT-10 Toddler Clinical Screening</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="home-page">
+    <nav>
+        <div class="left">
+            <a href="/home">Home</a>
+            <a href="/screen">New Screening</a>
+            <a href="/dashboard">Assessment History</a>
+            <a href="/community">Community</a>
+            <a href="/about">About</a>
+        </div>
+        <div class="right">
+            <span class="user-greeting">Hi, <%= user.username %></span>
+            <button><a href="/logout">Logout</a></button>
+        </div>
+    </nav>
+
+    <div class="assessment-container">
+        <div class="assessment-header">
+            <h2>Q-CHAT-10 Toddler Screening Assessment</h2>
+            <p>Artificial Neural Network Clinical Decision Support System</p>
+        </div>
+
+        <% if (error) { %>
+            <div class="alert-error"><%= error %></div>
+        <% } %>
+
+        <form action="/screen" method="POST" class="assessment-form">
+            <section class="form-section">
+                <h3>1. Demographic & Clinical Background</h3>
+                <div class="grid-2">
+                    <div>
+                        <label for="toddlerName">Child's Name / Identifier:</label>
+                        <input type="text" id="toddlerName" name="toddlerName" placeholder="e.g. Toddler A" required>
+                    </div>
+                    <div>
+                        <label for="ageMonths">Age in Months (12 - 60):</label>
+                        <input type="number" id="ageMonths" name="ageMonths" min="12" max="60" value="24" required>
+                    </div>
+                    <div>
+                        <label for="sex">Biological Sex:</label>
+                        <select id="sex" name="sex" required>
+                            <option value="m">Male</option>
+                            <option value="f">Female</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="ethnicity">Ethnicity:</label>
+                        <select id="ethnicity" name="ethnicity" required>
+                            <option value="asian">Asian</option>
+                            <option value="south asian">South Asian</option>
+                            <option value="white european">White European</option>
+                            <option value="middle eastern">Middle Eastern</option>
+                            <option value="black">Black</option>
+                            <option value="hispanic">Hispanic</option>
+                            <option value="latino">Latino</option>
+                            <option value="mixed">Mixed</option>
+                            <option value="others">Others</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="jaundice">Born with Jaundice?</label>
+                        <select id="jaundice" name="jaundice" required>
+                            <option value="no">No</option>
+                            <option value="yes">Yes</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="familyHistoryASD">Immediate Family Member with ASD?</label>
+                        <select id="familyHistoryASD" name="familyHistoryASD" required>
+                            <option value="no">No</option>
+                            <option value="yes">Yes</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h3>2. Behavioral Milestone Checklist (Q-CHAT-10)</h3>
+                
+                <div class="question-item">
+                    <p>1. Does your child look at you when you call their name?</p>
+                    <label><input type="radio" name="a1" value="0" required> Yes</label>
+                    <label><input type="radio" name="a1" value="1" required> No</label>
+                </div>
+
+                <div class="question-item">
+                    <p>2. How easy is it for you to get eye contact with your child?</p>
+                    <label><input type="radio" name="a2" value="0" required> Easy / Consistent</label>
+                    <label><input type="radio" name="a2" value="1" required> Difficult / Infrequent</label>
+                </div>
+
+                <div class="question-item">
+                    <p>3. Does your child point to indicate that they want something (e.g. out-of-reach toy)?</p>
+                    <label><input type="radio" name="a3" value="0" required> Yes</label>
+                    <label><input type="radio" name="a3" value="1" required> No</label>
+                </div>
+
+                <div class="question-item">
+                    <p>4. Does your child point to share an interest with you (e.g. pointing at an airplane)?</p>
+                    <label><input type="radio" name="a4" value="0" required> Yes</label>
+                    <label><input type="radio" name="a4" value="1" required> No</label>
+                </div>
+
+                <div class="question-item">
+                    <p>5. Does your child engage in pretend play (e.g. feeding a doll, toy car sounds)?</p>
+                    <label><input type="radio" name="a5" value="0" required> Yes</label>
+                    <label><input type="radio" name="a5" value="1" required> No</label>
+                </div>
+
+                <div class="question-item">
+                    <p>6. Does your child follow where you are looking?</p>
+                    <label><input type="radio" name="a6" value="0" required> Yes</label>
+                    <label><input type="radio" name="a6" value="1" required> No</label>
+                </div>
+
+                <div class="question-item">
+                    <p>7. If someone in the family is visibly upset, does the child comfort them?</p>
+                    <label><input type="radio" name="a7" value="0" required> Yes</label>
+                    <label><input type="radio" name="a7" value="1" required> No</label>
+                </div>
+
+                <div class="question-item">
+                    <p>8. Would you describe your child's first words as typical and timely?</p>
+                    <label><input type="radio" name="a8" value="0" required> Yes</label>
+                    <label><input type="radio" name="a8" value="1" required> No</label>
+                </div>
+
+                <div class="question-item">
+                    <p>9. Does your child use simple gestures (e.g. waving goodbye)?</p>
+                    <label><input type="radio" name="a9" value="0" required> Yes</label>
+                    <label><input type="radio" name="a9" value="1" required> No</label>
+                </div>
+
+                <div class="question-item">
+                    <p>10. Does your child stare at nothing with no apparent purpose?</p>
+                    <label><input type="radio" name="a10" value="1" required> Yes</label>
+                    <label><input type="radio" name="a10" value="0" required> No</label>
+                </div>
+            </section>
+
+            <button type="submit" class="submit-assessment-btn">Evaluate Screening with Neural Network</button>
+        </form>
+    </div>
+</body>
+</html>

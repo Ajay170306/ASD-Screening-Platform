@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assessment Records - ASD Platform</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="home-page">
+    <nav>
+        <div class="left">
+            <a href="/home">Home</a>
+            <a href="/screen">New Screening</a>
+            <a href="/dashboard">Patient Records</a>
+            <a href="/community">Support Community</a>
+            <a href="/about">About</a>
+        </div>
+        <div class="right">
+            <span class="user-greeting">Hi, <%= user.username %></span>
+            <button><a href="/logout">Logout</a></button>
+        </div>
+    </nav>
+
+    <div class="dashboard-wrapper">
+        <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <div>
+                <h2>Patient Screening History</h2>
+                <p style="color: #718096; margin-top: 4px;">Historical evaluation records processed through the neural network.</p>
+            </div>
+            <a href="/screen" class="btn-primary">+ Start New Assessment</a>
+        </div>
+
+        <% if (records && records.length > 0) { %>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Child / ID</th>
+                            <th>Age</th>
+                            <th>Sex</th>
+                            <th>Q-CHAT Score</th>
+                            <th>Risk Tier</th>
+                            <th>Probability</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% records.forEach(record => { %>
+                            <tr>
+                                <td><%= new Date(record.createdAt).toLocaleDateString() %></td>
+                                <td><strong><%= record.toddlerName %></strong></td>
+                                <td><%= record.ageMonths %> mos</td>
+                                <td><%= record.sex === 'm' ? 'Male' : 'Female' %></td>
+                                <td><%= record.qchatScore %> / 10</td>
+                                <td>
+                                    <span class="status-pill status-<%= record.prediction.riskTier.toLowerCase().split(' ')[0] %>">
+                                        <%= record.prediction.riskTier %>
+                                    </span>
+                                </td>
+                                <td><%= (record.prediction.probability * 100).toFixed(1) %>%</td>
+                                <td>
+                                    <button class="btn-sm" onclick="alert('Recommendation: <%= record.prediction.recommendation %>')">Summary</button>
+                                </td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        <% } else { %>
+            <div style="text-align: center; padding: 40px;">
+                <p style="margin-bottom: 16px; color: #718096;">No screening records found for this account.</p>
+                <a href="/screen" class="btn-primary">Conduct First Screening</a>
+            </div>
+        <% } %>
+    </div>
+</body>
+</html>
