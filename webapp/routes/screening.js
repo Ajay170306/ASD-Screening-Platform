@@ -3,10 +3,8 @@ const axios = require('axios');
 const router = express.Router();
 const ScreeningRecord = require('../models/ScreeningRecord');
 
-// Use Render environment variable with live fallback
 const ML_API_URL = process.env.ML_API_URL || 'https://asd-ml-service.onrender.com/api/v1/screen';
 
-// Middleware to ensure user is logged in
 function isAuthenticated(req, res, next) {
     if (req.session && req.session.user) {
         return next();
@@ -14,47 +12,62 @@ function isAuthenticated(req, res, next) {
     res.redirect('/login');
 }
 
-// GET screening form
 router.get('/screen', isAuthenticated, (req, res) => {
     res.render('screen', { error: null, user: req.session.user });
 });
 
-// POST screening form
 router.post('/screen', isAuthenticated, async (req, res) => {
     try {
-        const {
-            toddlerName, ageMonths, sex, ethnicity,
-            jaundice, familyHistory,
-            a1, a2, a3, a4, a5, a6, a7, a8, a9, a10
-        } = req.body;
+        const body = req.body;
 
-        const answers = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10].map(Number);
+        // Support both camelCase and snake_case field names from the HTML form
+        const toddlerName = body.toddlerName || body.toddler_name || body.name || 'Anonymous';
+        const ageMonths = parseInt(body.ageMonths || body.age_months || body.age || 24, 10);
+        const sex = (body.sex || body.gender || 'm').toString().toLowerCase();
+        const ethnicity = (body.ethnicity || 'asian').toString();
+        const jaundice = (body.jaundice || 'no').toString().toLowerCase();
+        const familyHistory = (body.familyHistory || body.family_history || body.family_mem_with_asd || 'no').toString().toLowerCase();
+
+        // Convert the 10 assessment answers to integers (0 or 1)
+        const a1 = parseInt(body.a1 || 0, 10);
+        const a2 = parseInt(body.a2 || 0, 10);
+        const a3 = parseInt(body.a3 || 0, 10);
+        const a4 = parseInt(body.a4 || 0, 10);
+        const a5 = parseInt(body.a5 || 0, 10);
+        const a6 = parseInt(body.a6 || 0, 10);
+        const a7 = parseInt(body.a7 || 0, 10);
+        const a8 = parseInt(body.a8 || 0, 10);
+        const a9 = parseInt(body.a9 || 0, 10);
+        const a10 = parseInt(body.a10 || 0, 10);
+
+        const answers = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10];
         const qchatScore = answers.reduce((acc, val) => acc + val, 0);
 
+        // Normalize sex to 'm' or 'f' to match standard model training format
+        const normalizedSex = sex.startsWith('m') ? 'm' : 'f';
+
         const payload = {
-            a1: answers[0], a2: answers[1], a3: answers[2], a4: answers[3], a5: answers[4],
-            a6: answers[5], a7: answers[6], a8: answers[7], a9: answers[8], a10: answers[9],
-            age_months: parseInt(ageMonths, 10),
-            sex: sex.toLowerCase(),
-            ethnicity: ethnicity,
-            jaundice: jaundice.toLowerCase(),
-            family_history: familyHistory.toLowerCase()
+            a1, a2, a3, a4, a5, a6, a7, a8, a9, a10,
+            age_months: ageMonths,
+            sex: normalizedSex,
+            ethnicity: ethnicity.toLowerCase(),
+            jaundice: jaundice.startsWith('y') ? 'yes' : 'no',
+            family_history: familyHistory.startsWith('y') ? 'yes' : 'no'
         };
 
-        // Call FastAPI ML inference microservice with 60s timeout for Render free tier
-        console.log(`Sending payload to ML service at: ${ML_API_URL}`);
+        // Call FastAPI ML inference microservice
         const response = await axios.post(ML_API_URL, payload, { timeout: 60000 });
         const prediction = response.data;
 
-        // Save screening record in MongoDB
+        // Persist screening record to MongoDB Atlas
         const record = new ScreeningRecord({
             userId: req.session.user._id,
             toddlerName,
-            ageMonths: parseInt(ageMonths, 10),
-            sex,
+            ageMonths,
+            sex: normalizedSex === 'm' ? 'Male' : 'Female',
             ethnicity,
-            jaundice,
-            familyHistory,
+            jaundice: payload.jaundice === 'yes' ? 'Yes' : 'No',
+            familyHistory: payload.family_history === 'yes' ? 'Yes' : 'No',
             qchatScore,
             prediction: {
                 riskTier: prediction.risk_tier,
@@ -68,23 +81,5 @@ router.post('/screen', isAuthenticated, async (req, res) => {
         res.render('result', { record, user: req.session.user });
 
     } catch (err) {
-        const detail = err.response ? JSON.stringify(err.response.data) : err.message;
-        console.error('Inference error details:', detail);
-        res.render('screen', {
-            error: `Inference service note: ${detail}`,
-            user: req.session.user
-        });
-    }
-});
-
-// GET dashboard records
-router.get('/dashboard', isAuthenticated, async (req, res) => {
-    try {
-        const records = await ScreeningRecord.find({ userId: req.session.user._id }).sort({ createdAt: -1 });
-        res.render('dashboard', { records, user: req.session.user });
-    } catch (err) {
-        res.render('dashboard', { records: [], error: 'Could not fetch records', user: req.session.user });
-    }
-});
-
-module.exports = router;
+        console.error('Screening Route Exception:', err.response ? err.response.data : err.message);
+        const detail = err.response ? JSON.stringify(err.response.data) : err
