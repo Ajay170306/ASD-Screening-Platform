@@ -3,7 +3,7 @@ const axios = require('axios');
 const router = express.Router();
 const ScreeningRecord = require('../models/ScreeningRecord');
 
-const ML_API_URL = process.env.ML_API_URL || 'https://asd-ml-service.onrender.com/api/v1/screen';
+const ML_API_URL = process.env.ML_API_URL || 'https://asd-ml-service-ajay.onrender.com/api/v1/screen';
 
 function isAuthenticated(req, res, next) {
     if (req.session && req.session.user) {
@@ -40,6 +40,7 @@ router.post('/screen', isAuthenticated, async (req, res) => {
         const answers = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10];
         const qchatScore = answers.reduce((acc, val) => acc + val, 0);
         const normalizedSex = sex.startsWith('m') ? 'm' : 'f';
+        const formattedFamilyHistory = familyHistory.startsWith('y') ? 'yes' : 'no';
 
         const payload = {
             a1, a2, a3, a4, a5, a6, a7, a8, a9, a10,
@@ -47,7 +48,8 @@ router.post('/screen', isAuthenticated, async (req, res) => {
             sex: normalizedSex,
             ethnicity: ethnicity.toLowerCase(),
             jaundice: jaundice.startsWith('y') ? 'yes' : 'no',
-            family_history: familyHistory.startsWith('y') ? 'yes' : 'no'
+            family_history: formattedFamilyHistory,
+            family_mem_with_asd: formattedFamilyHistory
         };
 
         const response = await axios.post(ML_API_URL, payload, { timeout: 60000 });
@@ -60,7 +62,7 @@ router.post('/screen', isAuthenticated, async (req, res) => {
             sex: normalizedSex === 'm' ? 'Male' : 'Female',
             ethnicity,
             jaundice: payload.jaundice === 'yes' ? 'Yes' : 'No',
-            familyHistory: payload.family_history === 'yes' ? 'Yes' : 'No',
+            familyHistory: formattedFamilyHistory === 'yes' ? 'Yes' : 'No',
             qchatScore,
             prediction: {
                 riskTier: prediction.risk_tier,
