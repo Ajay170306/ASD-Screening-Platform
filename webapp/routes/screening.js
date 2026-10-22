@@ -19,8 +19,6 @@ router.get('/screen', isAuthenticated, (req, res) => {
 router.post('/screen', isAuthenticated, async (req, res) => {
     try {
         const body = req.body;
-
-        // Support both camelCase and snake_case field names from the HTML form
         const toddlerName = body.toddlerName || body.toddler_name || body.name || 'Anonymous';
         const ageMonths = parseInt(body.ageMonths || body.age_months || body.age || 24, 10);
         const sex = (body.sex || body.gender || 'm').toString().toLowerCase();
@@ -28,7 +26,6 @@ router.post('/screen', isAuthenticated, async (req, res) => {
         const jaundice = (body.jaundice || 'no').toString().toLowerCase();
         const familyHistory = (body.familyHistory || body.family_history || body.family_mem_with_asd || 'no').toString().toLowerCase();
 
-        // Convert the 10 assessment answers to integers (0 or 1)
         const a1 = parseInt(body.a1 || 0, 10);
         const a2 = parseInt(body.a2 || 0, 10);
         const a3 = parseInt(body.a3 || 0, 10);
@@ -42,8 +39,6 @@ router.post('/screen', isAuthenticated, async (req, res) => {
 
         const answers = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10];
         const qchatScore = answers.reduce((acc, val) => acc + val, 0);
-
-        // Normalize sex to 'm' or 'f' to match standard model training format
         const normalizedSex = sex.startsWith('m') ? 'm' : 'f';
 
         const payload = {
@@ -55,11 +50,9 @@ router.post('/screen', isAuthenticated, async (req, res) => {
             family_history: familyHistory.startsWith('y') ? 'yes' : 'no'
         };
 
-        // Call FastAPI ML inference microservice
         const response = await axios.post(ML_API_URL, payload, { timeout: 60000 });
         const prediction = response.data;
 
-        // Persist screening record to MongoDB Atlas
         const record = new ScreeningRecord({
             userId: req.session.user._id,
             toddlerName,
@@ -79,10 +72,23 @@ router.post('/screen', isAuthenticated, async (req, res) => {
 
         await record.save();
         res.render('result', { record, user: req.session.user });
-
     } catch (err) {
-        console.error('Screening Route Exception:', err.response ? err.response.data : err.message);
-        const detail = err.response ? JSON.stringify(err.response.data) : err
+        const detail = err.response ? JSON.stringify(err.response.data) : err.message;
+        console.error('Screening Error Details:', detail);
+        res.render('screen', {
+            error: 'Inference error: ' + detail,
+            user: req.session.user
+        });
+    }
+});
 
+router.get('/dashboard', isAuthenticated, async (req, res) => {
+    try {
+        const records = await ScreeningRecord.find({ userId: req.session.user._id }).sort({ createdAt: -1 });
+        res.render('dashboard', { records, user: req.session.user });
+    } catch (err) {
+        res.render('dashboard', { records: [], error: 'Could not fetch records', user: req.session.user });
+    }
+});
 
-        
+module.exports = router;
