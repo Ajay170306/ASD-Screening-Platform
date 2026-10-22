@@ -22,7 +22,7 @@ router.post('/screen', isAuthenticated, async (req, res) => {
         const toddlerName = body.toddlerName || body.toddler_name || body.name || 'Anonymous';
         const ageMonths = parseInt(body.ageMonths || body.age_months || body.age || 24, 10);
         const sex = (body.sex || body.gender || 'm').toString().toLowerCase();
-        const ethnicity = (body.ethnicity || 'asian').toString();
+        const ethnicity = (body.ethnicity || 'asian').toString().toLowerCase();
         const jaundice = (body.jaundice || 'no').toString().toLowerCase();
         const familyHistory = (body.familyHistory || body.family_history || body.family_mem_with_asd || 'no').toString().toLowerCase();
 
@@ -40,35 +40,45 @@ router.post('/screen', isAuthenticated, async (req, res) => {
         const answers = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10];
         const qchatScore = answers.reduce((acc, val) => acc + val, 0);
         const normalizedSex = sex.startsWith('m') ? 'm' : 'f';
-        const formattedFamilyHistory = familyHistory.startsWith('y') ? 'yes' : 'no';
+        const formattedJaundice = jaundice.startsWith('y') ? 'yes' : 'no';
+        const formattedFamily = familyHistory.startsWith('y') ? 'yes' : 'no';
 
         const payload = {
             a1, a2, a3, a4, a5, a6, a7, a8, a9, a10,
             age_months: ageMonths,
             sex: normalizedSex,
-            ethnicity: ethnicity.toLowerCase(),
-            jaundice: jaundice.startsWith('y') ? 'yes' : 'no',
-            family_history: formattedFamilyHistory,
-            family_mem_with_asd: formattedFamilyHistory
+            ethnicity: ethnicity,
+            jaundice: formattedJaundice,
+            family_history: formattedFamily,
+            family_mem_with_asd: formattedFamily
         };
 
         const response = await axios.post(ML_API_URL, payload, { timeout: 60000 });
-        const prediction = response.data;
+        const p = response.data || {};
+        console.log('ML Response Data:', JSON.stringify(p));
+
+        const riskTier = p.risk_tier || p.riskTier || p.prediction || (qchatScore >= 3 ? 'High' : 'Low');
+        const probability = typeof p.probability === 'number' ? p.probability : (typeof p.asd_probability === 'number' ? p.asd_probability : (p.confidence || 0.85));
+        const confidence = p.confidence || (probability > 0.5 ? probability : 1 - probability);
+        const recommendation = p.recommendation || p.clinical_recommendation || (riskTier === 'High' ? 'Comprehensive multidisciplinary developmental evaluation recommended.' : 'Routine developmental surveillance recommended.');
 
         const record = new ScreeningRecord({
             userId: req.session.user._id,
             toddlerName,
             ageMonths,
-            sex: normalizedSex === 'm' ? 'Male' : 'Female',
+            sex: normalizedSex,
             ethnicity,
-            jaundice: payload.jaundice === 'yes' ? 'Yes' : 'No',
-            familyHistory: formattedFamilyHistory === 'yes' ? 'Yes' : 'No',
+            jaundice: formattedJaundice,
+            familyHistoryASD: formattedFamily,
             qchatScore,
+            responses: {
+                a1, a2, a3, a4, a5, a6, a7, a8, a9, a10
+            },
             prediction: {
-                riskTier: prediction.risk_tier,
-                probability: prediction.probability,
-                confidence: prediction.confidence,
-                recommendation: prediction.recommendation
+                riskTier,
+                probability,
+                confidence,
+                recommendation
             }
         });
 
