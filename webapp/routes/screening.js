@@ -1,87 +1,89 @@
 const express = require('express');
-const router = express.Router();
 const axios = require('axios');
+const router = express.Router();
 const ScreeningRecord = require('../models/ScreeningRecord');
 
-function requireAuth(req, res, next) {
-    if (req.session && req.session.user) return next();
+// Use Render environment variable with live fallback
+const ML_API_URL = process.env.ML_API_URL || 'https://asd-ml-service.onrender.com/api/v1/screen';
+
+// Middleware to ensure user is logged in
+function isAuthenticated(req, res, next) {
+    if (req.session && req.session.user) {
+        return next();
+    }
     res.redirect('/login');
 }
 
-// Render Questionnaire Stepper
-router.get('/screen', requireAuth, (req, res) => {
-    res.render('screen', { user: req.session.user, error: null });
+// GET screening form
+router.get('/screen', isAuthenticated, (req, res) => {
+    res.render('screen', { error: null, user: req.session.user });
 });
 
-// Process Questionnaire Responses & Call FastAPI
-router.post('/screen', requireAuth, async (req, res) => {
+// POST screening form
+router.post('/screen', isAuthenticated, async (req, res) => {
     try {
         const {
-            toddlerName, ageMonths, sex, ethnicity, jaundice, familyHistoryASD,
+            toddlerName, ageMonths, sex, ethnicity,
+            jaundice, familyHistory,
             a1, a2, a3, a4, a5, a6, a7, a8, a9, a10
         } = req.body;
 
+        const answers = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10].map(Number);
+        const qchatScore = answers.reduce((acc, val) => acc + val, 0);
+
         const payload = {
-            a1: parseInt(a1, 10),
-            a2: parseInt(a2, 10),
-            a3: parseInt(a3, 10),
-            a4: parseInt(a4, 10),
-            a5: parseInt(a5, 10),
-            a6: parseInt(a6, 10),
-            a7: parseInt(a7, 10),
-            a8: parseInt(a8, 10),
-            a9: parseInt(a9, 10),
-            a10: parseInt(a10, 10),
+            a1: answers[0], a2: answers[1], a3: answers[2], a4: answers[3], a5: answers[4],
+            a6: answers[5], a7: answers[6], a8: answers[7], a9: answers[8], a10: answers[9],
             age_months: parseInt(ageMonths, 10),
             sex: sex.toLowerCase(),
-            ethnicity: ethnicity.toLowerCase(),
+            ethnicity: ethnicity,
             jaundice: jaundice.toLowerCase(),
-            family_mem_with_asd: familyHistoryASD.toLowerCase()
+            family_history: familyHistory.toLowerCase()
         };
 
-        const apiEndpoint = process.env.ML_API_URL || 'http://127.0.0.1:8000/api/v1/screen';
-        const response = await axios.post(apiEndpoint, payload);
-        const { qchat_score, asd_probability, risk_tier, clinical_recommendation } = response.data;
+        // Call FastAPI ML inference microservice with 60s timeout for Render free tier
+        console.log(`Sending payload to ML service at: ${ML_API_URL}`);
+        const response = await axios.post(ML_API_URL, payload, { timeout: 60000 });
+        const prediction = response.data;
 
+        // Save screening record in MongoDB
         const record = new ScreeningRecord({
             userId: req.session.user._id,
-            toddlerName: toddlerName || 'Anonymous Child',
-            ageMonths: payload.age_months,
-            sex: payload.sex,
-            ethnicity: payload.ethnicity,
-            jaundice: payload.jaundice,
-            familyHistoryASD: payload.family_mem_with_asd,
-            responses: {
-                a1: payload.a1, a2: payload.a2, a3: payload.a3, a4: payload.a4, a5: payload.a5,
-                a6: payload.a6, a7: payload.a7, a8: payload.a8, a9: payload.a9, a10: payload.a10
-            },
-            qchatScore: qchat_score,
+            toddlerName,
+            ageMonths: parseInt(ageMonths, 10),
+            sex,
+            ethnicity,
+            jaundice,
+            familyHistory,
+            qchatScore,
             prediction: {
-                probability: asd_probability,
-                riskTier: risk_tier,
-                recommendation: clinical_recommendation
+                riskTier: prediction.risk_tier,
+                probability: prediction.probability,
+                confidence: prediction.confidence,
+                recommendation: prediction.recommendation
             }
         });
 
         await record.save();
-        res.render('result', { user: req.session.user, record });
+        res.render('result', { record, user: req.session.user });
+
     } catch (err) {
-        console.error("Screening failure:", err.message);
+        const detail = err.response ? JSON.stringify(err.response.data) : err.message;
+        console.error('Inference error details:', detail);
         res.render('screen', {
-            user: req.session.user,
-            error: "Inference engine connection failed. Please ensure the Python FastAPI service is running."
+            error: `Inference service note: ${detail}`,
+            user: req.session.user
         });
     }
 });
 
-// Patient Assessment History Dashboard
-router.get('/dashboard', requireAuth, async (req, res) => {
+// GET dashboard records
+router.get('/dashboard', isAuthenticated, async (req, res) => {
     try {
         const records = await ScreeningRecord.find({ userId: req.session.user._id }).sort({ createdAt: -1 });
-        res.render('dashboard', { user: req.session.user, records });
+        res.render('dashboard', { records, user: req.session.user });
     } catch (err) {
-        console.error(err);
-        res.redirect('/home');
+        res.render('dashboard', { records: [], error: 'Could not fetch records', user: req.session.user });
     }
 });
 
